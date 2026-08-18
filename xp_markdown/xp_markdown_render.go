@@ -12,9 +12,10 @@ import (
 	"fmt"
 
 	"github.com/0xdevelop/xjb_pdf/xp_fonts"
-	pdf "github.com/stephenafamo/goldmark-pdf"
+	"github.com/stephenafamo/goldmark-pdf"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/util"
 )
 
 // Page geometry of the rendered document. Fixed rather than configurable:
@@ -29,10 +30,11 @@ const (
 // Render renders CommonMark + GFM markdown into PDF bytes. Fonts, page
 // size and margins are package-internal; the caller supplies content only.
 //
-// Text rendering is self-contained: the embedded CJK-capable faces are
-// registered on the writer before the first draw call, so no font is fetched
-// over the network. Images are the exception — the upstream renderer resolves
-// an image whose destination is an http/https URL by fetching it at draw time.
+// Rendering makes no network calls: the embedded CJK-capable faces are
+// registered on the writer before the first draw call, and the image renderer
+// is replaced by one that only draws images the document carries inline (see
+// renderImageOffline). An image the markdown points at by http/https URL is
+// left out of the document instead of being fetched.
 //
 // ctx is checked before the render starts and is carried into the renderer.
 // The layout pass itself is synchronous and cannot be interrupted mid-document.
@@ -64,6 +66,7 @@ func Render(ctx context.Context, markdown []byte) ([]byte, error) {
 			pdf.WithHeadingFont(face),
 			pdf.WithBodyFont(face),
 			pdf.WithCodeFont(face),
+			pdf.WithNodeRenderers(util.Prioritized(offlineImageRenderer{}, offlineImagePriority)),
 		)),
 	)
 

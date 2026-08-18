@@ -11,7 +11,7 @@ import (
 	"embed"
 	"fmt"
 
-	pdf "github.com/stephenafamo/goldmark-pdf"
+	"github.com/stephenafamo/goldmark-pdf"
 )
 
 // embeddedFaces holds the shipped font files. They must carry glyf/loca
