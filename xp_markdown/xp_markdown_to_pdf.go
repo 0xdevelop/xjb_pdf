@@ -1,8 +1,8 @@
 // Package xp_markdown renders markdown source into a PDF document. It owns the
 // layout pass and binds every style slot to the embedded faces from xp_fonts.
 //
-// The module root re-exports Render as xjb_pdf.RenderMarkdown; import this
-// package directly only when the root facade is not wanted.
+// The module root re-exports MarkdownToPDF under the same name; import
+// this package directly only when the root facade is not wanted.
 package xp_markdown
 
 import (
@@ -27,18 +27,20 @@ const (
 	renderPageSize        = "A4"
 )
 
-// Render renders CommonMark + GFM markdown into PDF bytes. Fonts, page
-// size and margins are package-internal; the caller supplies content only.
+// MarkdownToPDF renders CommonMark + GFM markdown into PDF bytes: the layout
+// decisions — fonts, page size, margins — are package-internal, and the caller
+// supplies content only.
 //
 // Rendering makes no network calls: the embedded CJK-capable faces are
 // registered on the writer before the first draw call, and the image renderer
 // is replaced by one that only draws images the document carries inline (see
-// renderImageOffline). An image the markdown points at by http/https URL is
-// left out of the document instead of being fetched.
+// renderImageWithoutFetching). An image the markdown points at by http/https
+// URL is written as its alt text linking to that address, so the picture is
+// reachable from the document without the render ever contacting the host.
 //
 // ctx is checked before the render starts and is carried into the renderer.
 // The layout pass itself is synchronous and cannot be interrupted mid-document.
-func Render(ctx context.Context, markdown []byte) ([]byte, error) {
+func MarkdownToPDF(ctx context.Context, markdown []byte) ([]byte, error) {
 	if len(bytes.TrimSpace(markdown)) == 0 {
 		return nil, errors.New("xp_markdown: empty markdown input")
 	}
@@ -50,14 +52,14 @@ func Render(ctx context.Context, markdown []byte) ([]byte, error) {
 		Orientation: renderPageOrientation,
 		PaperSize:   renderPageSize,
 	}, nil)
-	if err := xp_fonts.Register(writer); err != nil {
+	if err := xp_fonts.RegisterEmbeddedFaces(writer); err != nil {
 		return nil, err
 	}
 
 	// All three options together cover the renderer's eleven style slots:
 	// headings plus table header, body plus blockquote plus table body, and
 	// the code face. A slot left at its default resolves to a Google font.
-	face := xp_fonts.Face()
+	face := xp_fonts.EmbeddedFace()
 	engine := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithRenderer(pdf.New(
@@ -66,7 +68,7 @@ func Render(ctx context.Context, markdown []byte) ([]byte, error) {
 			pdf.WithHeadingFont(face),
 			pdf.WithBodyFont(face),
 			pdf.WithCodeFont(face),
-			pdf.WithNodeRenderers(util.Prioritized(offlineImageRenderer{}, offlineImagePriority)),
+			pdf.WithNodeRenderers(util.Prioritized(noFetchImageRenderer{}, imageRendererPriority)),
 		)),
 	)
 

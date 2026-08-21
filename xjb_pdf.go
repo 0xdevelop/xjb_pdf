@@ -9,13 +9,13 @@ import (
 	"github.com/0xdevelop/xjb_pdf/xp_markdown"
 )
 
-func GetVersion() string {
+func ModuleVersion() string {
 	return xp_config.ProjectVersion
 }
 
-// RenderMarkdown renders CommonMark + GFM markdown into PDF bytes. Fonts, page
+// MarkdownToPDF renders CommonMark + GFM markdown into PDF bytes. Fonts, page
 // size and margins are fixed inside the module; the caller supplies content
-// only. See xp_markdown.Render for the behaviour this delegates to.
-func RenderMarkdown(ctx context.Context, markdown []byte) ([]byte, error) {
-	return xp_markdown.Render(ctx, markdown)
+// only. See xp_markdown.MarkdownToPDF for the behaviour this delegates to.
+func MarkdownToPDF(ctx context.Context, markdown []byte) ([]byte, error) {
+	return xp_markdown.MarkdownToPDF(ctx, markdown)
 }

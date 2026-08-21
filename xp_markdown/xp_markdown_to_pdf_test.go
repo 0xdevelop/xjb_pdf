@@ -33,10 +33,10 @@ func main() {
 ` + "```" + `
 `
 
-func TestRender(t *testing.T) {
-	out, err := Render(context.Background(), []byte(renderSampleMarkdown))
+func TestMarkdownToPDF(t *testing.T) {
+	out, err := MarkdownToPDF(context.Background(), []byte(renderSampleMarkdown))
 	if err != nil {
-		t.Fatalf("RenderMarkdown: %v", err)
+		t.Fatalf("MarkdownToPDF: %v", err)
 	}
 	if !bytes.HasPrefix(out, []byte("%PDF")) {
 		t.Fatalf("output is not a PDF document, first bytes: %q", out[:min(8, len(out))])
@@ -48,16 +48,16 @@ func TestRender(t *testing.T) {
 	}
 }
 
-func TestRenderRejectsEmptyInput(t *testing.T) {
-	if _, err := Render(context.Background(), []byte("   \n\t")); err == nil {
+func TestMarkdownToPDFRejectsEmptyInput(t *testing.T) {
+	if _, err := MarkdownToPDF(context.Background(), []byte("   \n\t")); err == nil {
 		t.Fatal("expected an error for blank markdown input")
 	}
 }
 
-func TestRenderHonoursCancelledContext(t *testing.T) {
+func TestMarkdownToPDFHonoursCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := Render(ctx, []byte("# heading")); err == nil {
+	if _, err := MarkdownToPDF(ctx, []byte("# heading")); err == nil {
 		t.Fatal("expected an error for a cancelled context")
 	}
 }

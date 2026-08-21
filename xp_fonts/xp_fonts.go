@@ -22,31 +22,32 @@ import (
 var embeddedFaces embed.FS
 
 const (
-	// Family is the family name every face is registered and selected under.
-	// Callers pass it nowhere — Face carries it — but the renderer resolves
-	// styles by family string, so registration and selection must agree.
-	Family = "XjbPDFSans"
+	// EmbeddedFamily is the family name every face is registered and selected
+	// under. Callers pass it nowhere — EmbeddedFace carries it — but the
+	// renderer resolves styles by family string, so registration and selection
+	// must agree.
+	EmbeddedFamily = "XjbPDFSans"
 
-	fileRegular = "NotoSansSC-Regular.ttf"
-	fileBold    = "NotoSansSC-Bold.ttf"
+	faceFileRegular = "NotoSansSC-Regular.ttf"
+	faceFileBold    = "NotoSansSC-Bold.ttf"
 )
 
-// Register loads the embedded faces into writer for all four styles the
-// renderer can select ("", "B", "I", "BI"). CJK type design carries no italic
+// RegisterEmbeddedFaces loads the embedded faces into writer for all four
+// styles the renderer can select ("", "B", "I", "BI"). CJK type design carries no italic
 // cut, so the italic slots reuse the upright faces; leaving a slot
 // unregistered makes the writer fail the moment markdown emphasis is rendered.
 //
 // The PDF writer latches parse failures internally instead of returning them,
 // so the latched error is read back here: a rejected font must surface as an
 // error rather than as a document with blank glyphs.
-func Register(writer *pdf.Fpdf) error {
-	regular, err := embeddedFaces.ReadFile(fileRegular)
+func RegisterEmbeddedFaces(writer *pdf.Fpdf) error {
+	regular, err := embeddedFaces.ReadFile(faceFileRegular)
 	if err != nil {
-		return fmt.Errorf("xp_fonts: read embedded face %s: %w", fileRegular, err)
+		return fmt.Errorf("xp_fonts: read embedded face %s: %w", faceFileRegular, err)
 	}
-	bold, err := embeddedFaces.ReadFile(fileBold)
+	bold, err := embeddedFaces.ReadFile(faceFileBold)
 	if err != nil {
-		return fmt.Errorf("xp_fonts: read embedded face %s: %w", fileBold, err)
+		return fmt.Errorf("xp_fonts: read embedded face %s: %w", faceFileBold, err)
 	}
 
 	faces := []struct {
@@ -59,7 +60,7 @@ func Register(writer *pdf.Fpdf) error {
 		{pdf.FontStyleBoldItalic, bold},
 	}
 	for _, face := range faces {
-		if err := writer.AddFont(Family, face.style, face.data); err != nil {
+		if err := writer.AddFont(EmbeddedFamily, face.style, face.data); err != nil {
 			return fmt.Errorf("xp_fonts: register style %q: %w", face.style, err)
 		}
 	}
@@ -70,14 +71,14 @@ func Register(writer *pdf.Fpdf) error {
 	return nil
 }
 
-// Face is the descriptor handed to every style slot of the renderer.
+// EmbeddedFace is the descriptor handed to every style slot of the renderer.
 // FontTypeCustom marks the face as already registered on the writer, which is
 // what stops the renderer from resolving and downloading a Google font.
-func Face() pdf.Font {
+func EmbeddedFace() pdf.Font {
 	return pdf.Font{
 		CanUseForText: true,
 		CanUseForCode: true,
-		Family:        Family,
+		Family:        EmbeddedFamily,
 		Type:          pdf.FontTypeCustom,
 	}
 }
