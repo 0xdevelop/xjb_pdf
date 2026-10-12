@@ -1,4 +1,4 @@
-package xp_markdown
+package xp_render
 
 import (
 	"bytes"

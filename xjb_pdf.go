@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xdevelop/xjb_pdf/xp_config"
 	"github.com/0xdevelop/xjb_pdf/xp_markdown"
+	"github.com/0xdevelop/xjb_pdf/xp_render"
 )
 
 func ModuleVersion() string {
@@ -18,4 +19,10 @@ func ModuleVersion() string {
 // only. See xp_markdown.MarkdownToPDF for the behaviour this delegates to.
 func MarkdownToPDF(ctx context.Context, markdown []byte) ([]byte, error) {
 	return xp_markdown.MarkdownToPDF(ctx, markdown)
+}
+
+// MarkdownToPDFWithExtensions preserves embedded CJK defaults while applying caller plugins.
+// Import xp_render directly to omit the bundled font assets.
+func MarkdownToPDFWithExtensions(ctx context.Context, markdown []byte, extensions ...xp_render.Extension) ([]byte, error) {
+	return xp_markdown.MarkdownToPDFWithExtensions(ctx, markdown, extensions...)
 }
