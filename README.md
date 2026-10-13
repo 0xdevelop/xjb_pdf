@@ -58,6 +58,8 @@ data, err := xp_render.MarkdownToPDF(ctx, markdown, faces, layout)
 
 `xp_fonts/` 内嵌 Noto Sans SC 的 Regular 与 Bold 两个字重（SIL Open Font License 1.1，许可证全文见 `xp_fonts/OFL.txt`）。CJK 字形没有斜体设计，斜体槽位复用对应正体。
 
+调用方需要在其他绘图组件中复用同一离线字体时，可用 `xp_fonts.EmbeddedFontFaces()` 取得 `xp_render.FontFaces`（Family、Regular、Bold）；每次返回独立字节副本，也可直接把它作为 PDF 渲染 Extension 传入。绘图、版式及业务规则由调用方实现。
+
 替换字体必须用**静态 TTF**：底层写入器直接解析 TrueType 的 `glyf` / `loca` 表，读不了 CFF/OpenType（`.otf`）和可变字体。
 
 每份 PDF 只嵌入实际用到的字形（按用到的码位子集化），所以文档体积跟字库大小无关——一份中英混排的样例报告约 40 KB。

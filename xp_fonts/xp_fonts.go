@@ -14,7 +14,8 @@ var embeddedFaces embed.FS
 
 const EmbeddedFamily = "XjbPDFSans"
 
-func embeddedFontFaces() (xp_render.FontFaces, error) {
+// EmbeddedFontFaces returns independent copies of the bundled offline TrueType faces.
+func EmbeddedFontFaces() (xp_render.FontFaces, error) {
 	regular, err := embeddedFaces.ReadFile("NotoSansSC-Regular.ttf")
 	if err != nil {
 		return xp_render.FontFaces{}, fmt.Errorf("xp_fonts: read regular face: %w", err)
@@ -30,7 +31,7 @@ func embeddedFontFaces() (xp_render.FontFaces, error) {
 type EmbeddedExtension struct{}
 
 func (EmbeddedExtension) Extend(c *xp_render.Config) error {
-	faces, err := embeddedFontFaces()
+	faces, err := EmbeddedFontFaces()
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func (EmbeddedExtension) Extend(c *xp_render.Config) error {
 }
 
 func RegisterEmbeddedFaces(writer *pdf.Fpdf) error {
-	faces, err := embeddedFontFaces()
+	faces, err := EmbeddedFontFaces()
 	if err != nil {
 		return err
 	}

@@ -130,6 +130,19 @@ func TestConcurrentTables(t *testing.T) {
 }
 
 func TestCJKLayoutExtension(t *testing.T) {
+	faces, err := xp_fonts.EmbeddedFontFaces()
+	if err != nil || faces.Family != xp_fonts.EmbeddedFamily || len(faces.Regular) < 12 || len(faces.Bold) < 12 {
+		t.Fatal("embedded font data unavailable", err)
+	}
+	other, err := xp_fonts.EmbeddedFontFaces()
+	if err != nil || !bytes.Equal(faces.Regular, other.Regular) || !bytes.Equal(faces.Bold, other.Bold) {
+		t.Fatal("font bytes changed between consumers", err)
+	}
+	other.Regular[0] ^= 0xff
+	other.Bold[0] ^= 0xff
+	if bytes.Equal(faces.Regular, other.Regular) || bytes.Equal(faces.Bold, other.Bold) {
+		t.Fatal("consumers share mutable font bytes")
+	}
 	plugin := xp_render.ExtensionFunc(func(c *xp_render.Config) error {
 		c.Page.Title = "通用插件渲染验收"
 		c.Styles.Normal.Size, c.Styles.Normal.Spacing = 10, 7
@@ -163,7 +176,7 @@ func TestCJKLayoutExtension(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		fmt.Fprintf(&doc, "| CASE-%03d | %s | 数据完整，等待业务审查。 |\n", i, strings.Repeat("中文表格换行及跨页检查：每个单元格保持自己的列位置。", 1+i%3))
 	}
-	out, err := xp_render.MarkdownToPDF(context.Background(), []byte(doc.String()), xp_fonts.EmbeddedExtension{}, plugin)
+	out, err := xp_render.MarkdownToPDF(context.Background(), []byte(doc.String()), faces, plugin)
 	if err != nil {
 		t.Fatal(err)
 	}
