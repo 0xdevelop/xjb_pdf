@@ -23,6 +23,7 @@ xp_markdown/   原 MarkdownToPDF 入口，默认组合内嵌字体插件后转�
 xp_render/     唯一 Markdown → PDF 渲染链、Extension 接口、本地字体插件与节点渲染
               不引用 xp_fonts，不嵌入字库；调用方可直接导入
 调用方插件     品牌、封面、页眉页脚、版式、专用渲染节点；不进入本库
+xp_inspect/    可选 PDF 检查入口，独立配置 Extension；文字/页面/字体/实际 Do 嵌图
 xp_fonts/      可选 EmbeddedExtension + 内嵌字体；保留原字体注册入口
 xp_config/     项目名与版本号（build.sh / git_tag.sh 读这里）
 ```
@@ -83,3 +84,21 @@ markdown 里指向 `http://` / `https://` 的图片**不会去拉**——底层�
 ## License
 
 BSD 3-Clause，见 `LICENSE`。内嵌字体单独适用 OFL 1.1。
+
+## PDF 产物检查扩展
+
+检查与渲染独立；直接导入 `xp_render` 的调用方不引用检查解析依赖。`xp_inspect.Inspect` 只读 PDF 字节，返回 Title、按绘制顺序提取的逐页文字、MediaBox、实际使用的字体及正文 Do 绘制的图片，不把未使用的图片资源计作已绘制。
+
+```go
+result, err := xp_inspect.Inspect(ctx, data,
+    xp_inspect.ExtensionFunc(func(c *xp_inspect.Config) error {
+        c.DecodeImages = true // 包含解码后的颜色分量样本，支持 PNG Predictor 15
+        c.MaxPDFBytes = 64 << 20
+        c.MaxStreamBytes = 64 << 20
+        return nil
+    }))
+```
+
+每次调用配置独立，不写文件、不联网、不读取主机字体。当前支持 Identity-H + 内嵌 ToUnicode（含跨字节范围）、标准/WinAnsi/MacRoman 简单字体；未知映射、加密、Form XObject、图片 mask/自定义 Decode 明确返回错误。默认只返回图片信息，开启 DecodeImages 才解码 samples；样本仍遵循其 ColorSpace 和 BitsPerComponent，不假定所有图片都是 RGB。上游解析不提供内容的视觉阅读顺序、OCR或完整 PDF/A 验证，本入口也不宣称这些能力。业务敏感规则、报告编号/层级、原图像素比较、发布裁决由调用方消费检查结果实施，不进入通用库。
+
+检查解析依赖使用 MIT `github.com/benoitkugler/pdf v0.0.15`（当前最新正式模块）；通过同一次解析的原始对象读取上层转换遗漏的 ToUnicode，页面继承与 CMap 范围使用有界遍历，不修改原 PDF 或依赖缓存。渲染依赖更新到 goldmark-pdf v0.4.2、goldmark v1.8.6 及其最新兼容传递版本，Go 仍为 1.26.2。
