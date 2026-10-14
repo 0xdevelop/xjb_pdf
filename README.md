@@ -53,6 +53,24 @@ faces := xp_render.FontFaces{
 data, err := xp_render.MarkdownToPDF(ctx, markdown, faces, layout)
 ```
 
+表格沿同一个 renderer 使用本次渲染参数，零值保留既有行为：
+
+```go
+layout := xp_render.ExtensionFunc(func(c *xp_render.Config) error {
+    c.Tables = xp_render.TableLayout{
+        LandscapeMinColumns: 11,
+        KeepRowsTogether: true,
+        Configure: func(w *pdf.Writer, data *pdf.TableData) error {
+            // 调用方按本表内容调整既有 THeader / TBody 样式。
+            return nil
+        },
+    }
+    return nil
+})
+```
+
+`LandscapeMinColumns` 为0时不切换方向，为2及以上时指定列数阈值；宽表续页保持横向，后续可见同级内容恢复基础方向，末尾宽表不额外产生恢复页。`KeepRowsTogether` 优先把可容纳整行移到新页；超过整页容量的行仍使用原分段续页，每页重绘表头。`Configure` 在测量本表前执行，错误/非法样式直接返回；不要保存本次 Writer 或 TableData。页眉页脚应读取当前页尺寸，避免将首张纵向页的尺寸用于横向页。需要宽表章节标题同页、封面或首个正文页方向时，由调用方已有版式扩展选择；本库不推测报告章节与品牌规则。
+
 品牌文字、标志、报告元数据、数据校验和发布决策由调用项目管理。本库不内置 Transo 或 DD 的业务规则。外部字体资源的许可也由提供方确认。原根包入口仍会链接内嵌字体；直接导入轻量包才可省去这部分资源。模块下载仍会包含仓库字体文件，不等于二进制或 PDF 文件大小。
 
 ## 字体

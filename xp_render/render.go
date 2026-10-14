@@ -26,6 +26,7 @@ func (f ExtensionFunc) Extend(c *Config) error { return f(c) }
 // Config belongs to a single call. Prepare runs after writer creation and before
 // Markdown layout, in extension order; it can register fonts or draw a cover.
 type Config struct {
+	Tables        TableLayout
 	Page          pdf.FpdfConfig
 	Styles        pdf.Styles
 	NodeRenderers util.PrioritizedSlice
@@ -56,6 +57,9 @@ func MarkdownToPDF(ctx context.Context, markdown []byte, extensions ...Extension
 			return nil, fmt.Errorf("xp_render: extension %d: %w", i, err)
 		}
 	}
+	if c.Tables.LandscapeMinColumns < 0 || c.Tables.LandscapeMinColumns == 1 {
+		return nil, errors.New("xp_render: invalid landscape column threshold")
+	}
 	if err := validateStyles(c.Styles); err != nil {
 		return nil, err
 	}
@@ -82,7 +86,7 @@ func MarkdownToPDF(ctx context.Context, markdown []byte, extensions ...Extension
 	}
 	config := pdf.DefaultConfig()
 	config.Context, config.PDF, config.Styles = ctx, writer, c.Styles
-	config.NodeRenderers = append(config.NodeRenderers, util.Prioritized(noFetchImageRenderer{}, imageRendererPriority), util.Prioritized(tableRenderer{ctx: ctx}, imageRendererPriority))
+	config.NodeRenderers = append(config.NodeRenderers, util.Prioritized(noFetchImageRenderer{}, imageRendererPriority), util.Prioritized(tableRenderer{ctx: ctx, layout: c.Tables, baseOrientation: c.Page.Orientation}, imageRendererPriority))
 	config.NodeRenderers = append(config.NodeRenderers, c.NodeRenderers...)
 	engine := goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithRenderer(pdf.New(pdf.WithConfig(config))))
 	var out bytes.Buffer

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/0xdevelop/xjb_pdf/xp_inspect"
 	"image/color"
 	"os"
 	"strings"
@@ -187,5 +188,126 @@ func TestCJKLayoutExtension(t *testing.T) {
 		if err := os.WriteFile(*artifactOutput, out, 0600); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestTableLayoutKeepsRowsAndWideContinuation(t *testing.T) {
+	ctx := context.Background()
+	start := func(c *xp_render.Config) error {
+		c.Styles.THeader.Size, c.Styles.TBody.Size = 9, 9
+		c.Styles.THeader.Spacing, c.Styles.TBody.Spacing = 3, 3
+		c.Prepare = append(c.Prepare, func(_ context.Context, w *pdf.Fpdf) error {
+			f := w.Fpdf
+			f.SetMargins(40, 40, 40)
+			f.SetAutoPageBreak(true, 40)
+			f.SetFont("Helvetica", "", 9)
+			f.SetXY(40, 700)
+			f.CellFormat(300, 12, "INTRO_BEFORE_TABLE", "", 0, "", false, 0, "")
+			f.SetXY(40, 730)
+			return nil
+		})
+		return nil
+	}
+	source := []byte("| Identifier value | Content |\n|---|---|\n| ROW_BEGIN | " + strings.Repeat("long row content ", 55) + " ROW_END |\n")
+	for _, keep := range []bool{false, true} {
+		data, err := xp_render.MarkdownToPDF(ctx, source, xp_render.ExtensionFunc(start), xp_render.ExtensionFunc(func(c *xp_render.Config) error { c.Tables.KeepRowsTogether = keep; return nil }))
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc, err := xp_inspect.Inspect(ctx, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(doc.Pages) != 2 || !strings.Contains(doc.Pages[0].Text, "INTRO_BEFORE_TABLE") {
+			t.Fatal("unexpected row pagination", len(doc.Pages))
+		}
+		if keep {
+			if strings.Contains(doc.Pages[0].Text, "ROW_BEGIN") || !strings.Contains(doc.Pages[1].Text, "ROW_BEGIN") || !strings.Contains(doc.Pages[1].Text, "ROW_END") {
+				t.Fatal("fitting row split or lost")
+			}
+		} else if !strings.Contains(doc.Pages[0].Text, "ROW_BEGIN") || !strings.Contains(doc.Pages[1].Text, "ROW_END") {
+			t.Fatal("zero-value layout changed")
+		}
+	}
+	for _, tail := range []bool{false, true} {
+		var md strings.Builder
+		md.WriteString("INTRO_NORMAL_PAGE\n\n")
+		for i := 0; i < 11; i++ {
+			fmt.Fprintf(&md, "| HEAD_%d", i)
+		}
+		md.WriteString("|\n")
+		for i := 0; i < 11; i++ {
+			md.WriteString("|---")
+		}
+		md.WriteString("|\n")
+		for row := 0; row < 80; row++ {
+			for col := 0; col < 11; col++ {
+				fmt.Fprintf(&md, "| C_%03d_%d", row, col)
+			}
+			md.WriteString("|\n")
+		}
+		if tail {
+			md.WriteString("\nAFTER_WIDE_TABLE\n")
+		}
+		calls := 0
+		data, err := xp_render.MarkdownToPDF(ctx, []byte(md.String()), xp_render.ExtensionFunc(func(c *xp_render.Config) error {
+			c.Tables = xp_render.TableLayout{LandscapeMinColumns: 11, KeepRowsTogether: true, Configure: func(w *pdf.Writer, d *pdf.TableData) error {
+				calls++
+				if len(d.Headers) != 11 {
+					t.Fatal("wrong table")
+				}
+				w.Styles.THeader.Size, w.Styles.TBody.Size = 8, 8
+				return nil
+			}}
+			return nil
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc, err := xp_inspect.Inspect(ctx, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if calls != 1 {
+			t.Fatal("Configure not once per table", calls)
+		}
+		wide := 0
+		last := false
+		for _, page := range doc.Pages {
+			if strings.Contains(page.Text, "C_") {
+				wide++
+				if page.MediaBox[2] <= page.MediaBox[3] || !strings.Contains(page.Text, "HEAD_0") {
+					t.Fatal("wide continuation lost orientation/header")
+				}
+				last = last || strings.Contains(page.Text, "C_079_10")
+			}
+		}
+		end := doc.Pages[len(doc.Pages)-1]
+		if wide < 2 || !last {
+			t.Fatal("wide table rows lost", wide, last)
+		}
+		if tail {
+			if end.MediaBox[2] >= end.MediaBox[3] || !strings.Contains(strings.Join(strings.Fields(end.Text), ""), "AFTER_WIDE_TABLE") {
+				t.Fatalf("base orientation not restored: box=%v text=%q", end.MediaBox, end.Text)
+			}
+		} else if end.MediaBox[2] <= end.MediaBox[3] {
+			t.Fatal("trailing wide table added blank restore page")
+		}
+	}
+	want := errors.New("table plugin failure")
+	if _, err := xp_render.MarkdownToPDF(ctx, source, xp_render.ExtensionFunc(func(c *xp_render.Config) error {
+		c.Tables.Configure = func(*pdf.Writer, *pdf.TableData) error { return want }
+		return nil
+	})); !errors.Is(err, want) {
+		t.Fatal("table plugin error lost", err)
+	}
+	if _, err := xp_render.MarkdownToPDF(ctx, source, xp_render.ExtensionFunc(func(c *xp_render.Config) error { c.Tables.LandscapeMinColumns = 1; return nil })); err == nil {
+		t.Fatal("invalid threshold accepted")
+	}
+	if _, err := xp_render.MarkdownToPDF(ctx, source, xp_render.ExtensionFunc(func(c *xp_render.Config) error {
+		c.Tables.Configure = func(w *pdf.Writer, _ *pdf.TableData) error { w.Styles.TBody.Size = 0; return nil }
+		return nil
+	})); err == nil {
+		t.Fatal("invalid table style accepted")
 	}
 }
